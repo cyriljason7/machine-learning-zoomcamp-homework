@@ -1,31 +1,68 @@
 import pickle
 
+from typing import Literal
+from fastapi import FastAPI
+from pydantic import BaseModel, Field, ConfigDict
+import uvicorn
+
+
+#request
+
+class Customer(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    gender: Literal["male", "female"]
+    seniorcitizen: Literal[0, 1]
+    partner: Literal["yes", "no"]
+    dependents: Literal["yes", "no"]
+    phoneservice: Literal["yes", "no"]
+    multiplelines: Literal["no", "yes", "no_phone_service"]
+    internetservice: Literal["dsl", "fiber_optic", "no"]
+    onlinesecurity: Literal["no", "yes", "no_internet_service"]
+    onlinebackup: Literal["no", "yes", "no_internet_service"]
+    deviceprotection: Literal["no", "yes", "no_internet_service"]
+    techsupport: Literal["no", "yes", "no_internet_service"]
+    streamingtv: Literal["no", "yes", "no_internet_service"]
+    streamingmovies: Literal["no", "yes", "no_internet_service"]
+    contract: Literal["month-to-month", "one_year", "two_year"]
+    paperlessbilling: Literal["yes", "no"]
+    paymentmethod: Literal[
+        "electronic_check",
+        "mailed_check",
+        "bank_transfer_(automatic)",
+        "credit_card_(automatic)",
+    ]
+    tenure: int = Field(..., ge=0)
+    monthlycharges: float = Field(..., ge=0.0)
+    totalcharges: float = Field(..., ge=0.0)
+
+
+#response
+
+class PredictResponse(BaseModel):
+    churn_probability: float
+    churn_decision: bool
+
+
+#api app
+app = FastAPI(title = 'churn-prediction')
+
+
 with open('model.bin','rb') as f_in:
    pipeline = pickle.load(f_in)
+   
 
-customer = {'gender': 'male',
- 'seniorcitizen': 0,
- 'partner': 'no',
- 'dependents': 'yes',
- 'phoneservice': 'no',
- 'multiplelines': 'no_phone_service',
- 'internetservice': 'dsl',
- 'onlinesecurity': 'no',
- 'onlinebackup': 'no',
- 'deviceprotection': 'yes',
- 'techsupport': 'no',
- 'streamingtv': 'no',
- 'streamingmovies': 'yes',
- 'contract': 'month-to-month',
- 'paperlessbilling': 'yes',
- 'paymentmethod': 'electronic_check',
- 'tenure': 6,
- 'monthlycharges': 29.65,
- 'totalcharges': 129.65}
+def predict_single(customer):
+    result = pipeline.predict_proba(customer)[0,1]
+    return float(result)
 
-churn = pipeline.predict_proba(customer)[0,1]
-print(f'prob of churning = {churn}')
-if churn >=0.5:
-    print("send promo email")
-else:
-    print("don't do anything")
+@app.post("/prediction")
+def predict(customer: Customer)-> PredictResponse:
+    churn = predict_single(customer.model_dump())
+
+    return {'churn_probability': churn,
+            'churn_decision': bool(churn >= 0.5)
+           }
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=9696)
+
