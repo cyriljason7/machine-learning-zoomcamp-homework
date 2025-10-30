@@ -3,7 +3,7 @@ import requests
 url = 'http://localhost:9696/prediction'
 
 customer = {'gender': 'male',
- 'seniorcitizen': 10,
+ 'seniorcitizen': 0,
  'partner': 'no',
  'dependents': 'yes',
  'phoneservice': 'no',
